@@ -16,7 +16,7 @@ import json, sys, time, datetime as dt
 import pandas as pd
 
 import config, universe as uni
-import indicators as ind, signals as sig, catalysts as cat
+import indicators as ind, signals as sig, catalysts as cat, sentiment as sent
 
 try:
     import yfinance as yf
@@ -187,13 +187,20 @@ def build():
         else:
             assets.append(analyze(m, df, th))
 
-    # Earnings: only for focus-15 + anything that fired (keeps run fast)
+    # Earnings + headlines: only for focus + anything that fired (keeps run fast)
     for a in assets:
         if a["focus"] or a.get("fired"):
             try:
-                a["earnings"] = cat.earnings_date(yf.Ticker(a["ticker"]))
+                tk = yf.Ticker(a["ticker"])
+                a["earnings"] = cat.earnings_date(tk)
+                a["headlines"] = sent.asset_headlines(tk, limit=4)
             except Exception:
                 a["earnings"] = None
+                a["headlines"] = []
+
+    # Market-wide sentiment (Fear & Greed gauges)
+    market = sent.market_sentiment()
+    log(f"Sentiment — stock F&G: {market['stock']}, crypto F&G: {market['crypto']}")
 
     # Calendar window
     today = dt.date.today()
@@ -227,6 +234,7 @@ def build():
         "focus": focus,
         "universe": universe_assets,
         "calendar": calendar_feed,
+        "sentiment": market,
         "stats": {"ok": ok, "failed": len(assets) - ok, "total": len(assets), "fired": fired},
     }
     with open(config.OUTPUT_FILE, "w") as f:

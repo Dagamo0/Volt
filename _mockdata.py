@@ -75,7 +75,8 @@ def make(meta, focus):
                        "volRatio":f"{random.uniform(0.8,3.5):.1f}x avg",
                        "weeklyTrend":_wk},
             "scanners":{"turtle":turtle,"swing":swing,"snapback":snap},
-            "earnings":(dt.date.today()+dt.timedelta(days=random.randint(2,70))).isoformat() if random.random()<0.3 else None}
+            "earnings":(dt.date.today()+dt.timedelta(days=random.randint(2,70))).isoformat() if random.random()<0.3 else None,
+            "headlines":([{"title":h,"publisher":random.choice(["Reuters","Bloomberg","CNBC","Barron's"]),"link":"https://finance.yahoo.com","published":(dt.date.today()-dt.timedelta(days=random.randint(0,3))).strftime("%b %d")} for h in random.sample(["Analyst raises price target on strong demand","Chip sector rallies on AI capex guidance","Options activity spikes ahead of earnings","Macro headwinds weigh on the tape","Insider buying disclosed in filing","Upgrade cites margin expansion"], k=random.randint(1,3))] if (focus or fired) else [])}
 
 metas=[]
 for a in config.WATCHLIST:
@@ -99,11 +100,17 @@ macro=cat.macro_events(today,end)
 earn=[{"date":a["earnings"],"text":f"{a['ticker']} earnings","tag":"earnings","scope":a["ticker"]}
       for a in assets if a["earnings"] and a["earnings"]<=(end+dt.timedelta(days=75)).isoformat()]
 calf=sorted(macro+earn,key=lambda x:x["date"])
+import sentiment as _sm
+_sv, _cv = random.randint(20,80), random.randint(20,80)
+sent_block={"stock":{"value":_sv,"label":_sm.label_from_value(_sv)},
+            "crypto":{"value":_cv,"label":_sm.label_from_value(_cv)},
+            "asOf":dt.datetime.utcnow().isoformat()+"Z"}
 ok=len(assets); fired=sum(1 for a in assets if a["fired"])
 payload={"generated":dt.datetime.utcnow().isoformat()+"Z","sensitivity":config.SENSITIVITY,
          "defaultAccountSize":config.DEFAULT_ACCOUNT_SIZE,"riskPerTradePct":config.RISK_PER_TRADE_PCT,
          "atrStopMultiple":config.ATR_STOP_MULTIPLE,
          "focus":[a for a in assets if a["focus"]],"universe":assets,"calendar":calf,
+         "sentiment":sent_block,
          "stats":{"ok":ok,"failed":0,"total":len(assets),"fired":fired}}
 json.dump(payload,open("data.json","w"),indent=2,default=str)
 print(f"Wrote data.json: {len(assets)} assets, {fired} fired, {len(calf)} calendar events")
