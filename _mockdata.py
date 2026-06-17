@@ -11,6 +11,33 @@ def spark(base):
         p *= (1 + random.uniform(-0.02, 0.022)); out.append(round(p, 4))
     return out
 
+def ohlc_chart(base):
+    """Generate 90 days of plausible OHLC bars + Turtle channel overlays."""
+    import datetime as _dt
+    bars=[]; p=base*0.85
+    start=_dt.date.today()-_dt.timedelta(days=125)  # ~90 trading days back
+    d=start
+    closes=[]
+    while len(bars)<90:
+        if d.weekday()<5:  # weekdays only
+            o=p
+            c=o*(1+random.uniform(-0.025,0.027))
+            hi=max(o,c)*(1+random.uniform(0,0.015))
+            lo=min(o,c)*(1-random.uniform(0,0.015))
+            bars.append({"time":d.isoformat(),"open":round(o,2),"high":round(hi,2),"low":round(lo,2),"close":round(c,2)})
+            closes.append(c); p=c
+        d+=_dt.timedelta(days=1)
+    def chan(n,kind):
+        out=[]
+        for i,b in enumerate(bars):
+            if i<n: continue
+            window=bars[i-n:i]
+            v=max(x["high"] for x in window) if kind=="high" else min(x["low"] for x in window)
+            out.append({"time":b["time"],"value":round(v,2)})
+        return out
+    return {"bars":bars,"ch20High":chan(20,"high"),"ch20Low":chan(20,"low"),
+            "ch55High":chan(55,"high"),"ch55Low":chan(55,"low")}
+
 def make(meta, focus):
     base = random.uniform(20, 600) if meta["category"] in ("equity","ai","momentum","index") else \
            random.uniform(30000,110000) if meta["category"]=="crypto" else random.uniform(1,3500)
@@ -76,7 +103,8 @@ def make(meta, focus):
                        "weeklyTrend":_wk},
             "scanners":{"turtle":turtle,"swing":swing,"snapback":snap},
             "earnings":(dt.date.today()+dt.timedelta(days=random.randint(2,70))).isoformat() if random.random()<0.3 else None,
-            "headlines":([{"title":h,"publisher":random.choice(["Reuters","Bloomberg","CNBC","Barron's"]),"link":"https://finance.yahoo.com","published":(dt.date.today()-dt.timedelta(days=random.randint(0,3))).strftime("%b %d")} for h in random.sample(["Analyst raises price target on strong demand","Chip sector rallies on AI capex guidance","Options activity spikes ahead of earnings","Macro headwinds weigh on the tape","Insider buying disclosed in filing","Upgrade cites margin expansion"], k=random.randint(1,3))] if (focus or fired) else [])}
+            "headlines":([{"title":h,"publisher":random.choice(["Reuters","Bloomberg","CNBC","Barron's"]),"link":"https://finance.yahoo.com","published":(dt.date.today()-dt.timedelta(days=random.randint(0,3))).strftime("%b %d")} for h in random.sample(["Analyst raises price target on strong demand","Chip sector rallies on AI capex guidance","Options activity spikes ahead of earnings","Macro headwinds weigh on the tape","Insider buying disclosed in filing","Upgrade cites margin expansion"], k=random.randint(1,3))] if (focus or fired) else []),
+            "chart":(ohlc_chart(price) if (focus or fired) else None)}
 
 metas=[]
 for a in config.WATCHLIST:

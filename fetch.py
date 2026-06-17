@@ -138,6 +138,36 @@ def analyze(meta, df, th):
         vol20 = df["Volume"].rolling(20).mean().iloc[-1]
         vol_ratio = float(last["Volume"] / vol20) if vol20 else 1.0
 
+        # Chart data — only for fired or focus assets (keeps data.json lean).
+        # ~90 days of OHLC + the 20/55-day Turtle channel lines for overlay.
+        chart = None
+        if meta["focus"] or bool(turtle or swing or snap):
+            hi20 = ind.rolling_extreme(df["High"], 20, "high")
+            lo20 = ind.rolling_extreme(df["Low"], 20, "low")
+            hi55 = ind.rolling_extreme(df["High"], 55, "high")
+            lo55 = ind.rolling_extreme(df["Low"], 55, "low")
+            tail = df.iloc[-90:]
+            bars, ch20h, ch20l, ch55h, ch55l = [], [], [], [], []
+            for ts, row in tail.iterrows():
+                t = ts.strftime("%Y-%m-%d")
+                bars.append({"time": t,
+                             "open": round(float(row["Open"]), 4),
+                             "high": round(float(row["High"]), 4),
+                             "low": round(float(row["Low"]), 4),
+                             "close": round(float(row["Close"]), 4)})
+                def _v(series):
+                    x = series.get(ts)
+                    return round(float(x), 4) if x is not None and not pd.isna(x) else None
+                ch20h.append({"time": t, "value": _v(hi20)})
+                ch20l.append({"time": t, "value": _v(lo20)})
+                ch55h.append({"time": t, "value": _v(hi55)})
+                ch55l.append({"time": t, "value": _v(lo55)})
+            chart = {"bars": bars,
+                     "ch20High": [c for c in ch20h if c["value"] is not None],
+                     "ch20Low": [c for c in ch20l if c["value"] is not None],
+                     "ch55High": [c for c in ch55h if c["value"] is not None],
+                     "ch55Low": [c for c in ch55l if c["value"] is not None]}
+
         out.update({
             "price": round(price, 4), "change": round(change_pct, 2),
             "vol": vscore, "volLabel": vlabel, "volColor": vcolor,
@@ -157,6 +187,7 @@ def analyze(meta, df, th):
             },
             "scanners": {"turtle": turtle, "swing": swing, "snapback": snap},
             "earnings": None,
+            "chart": chart,
         })
     except Exception as e:
         out.update({"price": None, "change": None, "signal": "neutral",
